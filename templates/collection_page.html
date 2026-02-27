@@ -253,8 +253,7 @@
                             <th>Custom Name</th>
                             <th>Description</th>
                             <th style="width: 90px;">Length</th>
-                            <th style="width: 170px;">HLS Status</th>
-                            <th style="width: 170px;">Progress</th>
+                            <th style="width: 230px;">HLS</th>
                             <th style="width: 90px;">Order</th>
                         </tr>
                     </thead>
@@ -274,16 +273,16 @@
                                 <textarea name="description_{{ v.id }}" rows="2" class="compact-input">{{ v.description or '' }}</textarea>
                             </td>
                             <td style="color: #b6aa99;">{{ v.duration_seconds|duration_label }}</td>
-                            <td style="color: #b6aa99;">
+                            <td>
                                 <span id="hls-status-{{ v.id }}" class="status-chip status-{{ v.hls_status|lower }}">{{ v.hls_status }}</span>
                                 <span id="hls-segments-{{ v.id }}">({{ v.hls_segments_generated }}/{{ v.hls_segments_expected }})</span>
-                            </td>
-                            <td>
                                 {% set progress_pct = v.hls_progress_pct or 0 %}
-                                <div class="progress-track">
-                                    <div id="hls-progress-fill-{{ v.id }}" class="progress-fill" style="width: {{ progress_pct }}%;"></div>
+                                <div id="hls-progress-wrap-{{ v.id }}" {% if progress_pct >= 100 %}style="display: none;"{% endif %}>
+                                    <div class="progress-track">
+                                        <div id="hls-progress-fill-{{ v.id }}" class="progress-fill" style="width: {{ progress_pct }}%;"></div>
+                                    </div>
+                                    <div id="hls-progress-text-{{ v.id }}" class="progress-text">{{ progress_pct }}% {{ v.hls_step or '' }}</div>
                                 </div>
-                                <div id="hls-progress-text-{{ v.id }}" class="progress-text">{{ progress_pct }}% {{ v.hls_step or '' }}</div>
                             </td>
                             <td>
                                 <input
@@ -337,10 +336,11 @@ const collectionId = "{{ collection.id }}";
 function applyHlsProgress(item) {
     const statusEl = document.getElementById(`hls-status-${item.id}`);
     const segmentsEl = document.getElementById(`hls-segments-${item.id}`);
+    const progressWrapEl = document.getElementById(`hls-progress-wrap-${item.id}`);
     const fillEl = document.getElementById(`hls-progress-fill-${item.id}`);
     const textEl = document.getElementById(`hls-progress-text-${item.id}`);
 
-    if (!statusEl || !segmentsEl || !fillEl || !textEl) return;
+    if (!statusEl || !segmentsEl || !progressWrapEl || !fillEl || !textEl) return;
 
     const normalizedStatus = (item.status || "pending").toLowerCase();
     const progress = Math.max(0, Math.min(100, Number(item.progress_pct || 0)));
@@ -348,6 +348,7 @@ function applyHlsProgress(item) {
     statusEl.textContent = item.status || "pending";
     statusEl.className = `status-chip status-${normalizedStatus}`;
     segmentsEl.textContent = `(${item.segments_generated}/${item.segments_expected})`;
+    progressWrapEl.style.display = progress >= 100 ? "none" : "block";
     fillEl.style.width = `${progress}%`;
     textEl.textContent = `${progress}% ${item.step || ""}`.trim();
 }
