@@ -100,7 +100,7 @@
                 data-video-id="{{ v.id }}"
                 data-video-name="{{ v.display_name or v.filename }}"
             >
-                {{ v.display_name or v.filename }}
+                {{ loop.index }}. {{ v.display_name or v.filename }}
             </button>
         {% endfor %}
     </div>
