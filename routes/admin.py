@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 
 from db import get_collection_parent_options, get_db
 from decorators import admin_required
-from hls_utils import convert_to_hls
+from hls_utils import convert_to_hls, probe_duration_seconds
 from settings import UPLOAD_FOLDER
 
 admin_bp = Blueprint("admin", __name__)
@@ -99,6 +99,7 @@ def upload():
         final_display_name = display_name or filename
         save_path = os.path.join(UPLOAD_FOLDER, video_id + "_" + filename)
         file.save(save_path)
+        duration_seconds = probe_duration_seconds(save_path)
 
         conn = get_db()
         max_order_row = conn.execute(
@@ -113,8 +114,8 @@ def upload():
             sort_order = next_sort_order
 
         conn.execute(
-            "INSERT INTO videos (id, filename, display_name, sort_order, visibility, collection_id) VALUES (?, ?, ?, ?, ?, ?)",
-            (video_id, filename, final_display_name, sort_order, visibility, collection_id),
+            "INSERT INTO videos (id, filename, display_name, duration_seconds, sort_order, visibility, collection_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (video_id, filename, final_display_name, duration_seconds, sort_order, visibility, collection_id),
         )
         conn.commit()
         conn.close()

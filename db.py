@@ -33,6 +33,7 @@ def init_db():
         id TEXT PRIMARY KEY,
         filename TEXT NOT NULL,
         display_name TEXT,
+        duration_seconds INTEGER NOT NULL DEFAULT 0,
         sort_order INTEGER NOT NULL DEFAULT 0,
         visibility TEXT NOT NULL DEFAULT 'public',
         collection_id TEXT,
@@ -49,6 +50,8 @@ def init_db():
     }
     if "display_name" not in columns:
         c.execute("ALTER TABLE videos ADD COLUMN display_name TEXT")
+    if "duration_seconds" not in columns:
+        c.execute("ALTER TABLE videos ADD COLUMN duration_seconds INTEGER NOT NULL DEFAULT 0")
     if "sort_order" not in columns:
         c.execute("ALTER TABLE videos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
 

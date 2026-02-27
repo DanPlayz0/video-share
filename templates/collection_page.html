@@ -100,7 +100,7 @@
                 data-video-id="{{ v.id }}"
                 data-video-name="{{ v.display_name or v.filename }}"
             >
-                {{ loop.index }}. {{ v.display_name or v.filename }}
+                {{ loop.index }}. {{ v.display_name or v.filename }} ({{ v.duration_seconds|duration_label }})
             </button>
         {% endfor %}
     </div>
@@ -118,6 +118,7 @@
                 <tr>
                     <th style="text-align: left; padding: 6px;">Video</th>
                     <th style="text-align: left; padding: 6px;">Custom Name</th>
+                    <th style="text-align: left; padding: 6px; width: 90px;">Length</th>
                     <th style="text-align: left; padding: 6px; width: 110px;">Order</th>
                 </tr>
             </thead>
@@ -133,6 +134,7 @@
                             style="width: 100%;"
                         >
                     </td>
+                    <td style="padding: 6px; color: #b6aa99;">{{ v.duration_seconds|duration_label }}</td>
                     <td style="padding: 6px;">
                         <input
                             type="number"

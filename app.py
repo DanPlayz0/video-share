@@ -40,6 +40,22 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(public_bp)
 
+    @app.template_filter("duration_label")
+    def duration_label(value):
+        try:
+            total = int(value or 0)
+        except (TypeError, ValueError):
+            total = 0
+
+        if total <= 0:
+            return "--:--"
+
+        hours, remainder = divmod(total, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours:
+            return f"{hours:d}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes:02d}:{seconds:02d}"
+
     @app.errorhandler(403)
     def forbidden(error):
         message = getattr(error, "description", None) or "You do not have permission to view this page."
