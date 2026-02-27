@@ -94,6 +94,20 @@
         <h3>Collection Settings (Admin)</h3>
         <form method="POST" action="/admin/collection/{{ collection.id }}/settings">
             <input type="hidden" name="return_path" value="{{ request.full_path if request.query_string else request.path }}">
+            <label for="collection-name">Collection Name</label><br>
+            <input id="collection-name" name="name" type="text" value="{{ collection.name }}" style="margin-top: 8px; margin-bottom: 8px; width: 100%;"><br>
+
+            <label for="collection-slug">URL Slug</label><br>
+            <input id="collection-slug" name="slug" type="text" value="{{ collection.slug }}" style="margin-top: 8px; margin-bottom: 8px; width: 100%;"><br>
+
+            <label for="collection-parent">Parent Collection</label><br>
+            <select id="collection-parent" name="parent_id" style="margin-top: 8px; margin-bottom: 8px; width: 100%;">
+                <option value="">Top-Level</option>
+                {% for option in parent_options %}
+                    <option value="{{ option.id }}" {% if collection.parent_id == option.id %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+            </select><br>
+
             <label for="collection-visibility">Visibility</label><br>
             <select id="collection-visibility" name="visibility" style="margin-top: 8px; margin-bottom: 8px;">
                 <option value="public" {% if collection.visibility == "public" %}selected{% endif %}>Public</option>

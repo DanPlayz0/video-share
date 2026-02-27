@@ -2,10 +2,28 @@ import os
 
 from flask import Blueprint, abort, redirect, render_template, request, send_from_directory, session
 
-from db import get_db
+from db import get_collection_parent_options, get_db
 from settings import HLS_FOLDER
 
 public_bp = Blueprint("public", __name__)
+
+
+def get_descendant_ids(conn, root_id):
+    rows = conn.execute("SELECT id, parent_id FROM collections").fetchall()
+    by_parent = {}
+    for row in rows:
+        by_parent.setdefault(row["parent_id"], []).append(row["id"])
+
+    descendants = set()
+    stack = [root_id]
+    while stack:
+        current = stack.pop()
+        for child_id in by_parent.get(current, []):
+            if child_id not in descendants:
+                descendants.add(child_id)
+                stack.append(child_id)
+
+    return descendants
 
 
 @public_bp.route("/")
@@ -82,6 +100,11 @@ def collection_page(collection_path):
             "SELECT * FROM videos WHERE collection_id = ? ORDER BY sort_order ASC, filename COLLATE NOCASE ASC",
             (collection["id"],),
         ).fetchall()
+        descendants = get_descendant_ids(conn, collection["id"])
+        parent_options = [
+            option for option in get_collection_parent_options(conn)
+            if option["id"] != collection["id"] and option["id"] not in descendants
+        ]
     else:
         sub_collections = conn.execute(
             "SELECT * FROM collections WHERE parent_id = ? AND visibility = 'public'", (collection["id"],)
@@ -90,6 +113,7 @@ def collection_page(collection_path):
             "SELECT * FROM videos WHERE collection_id = ? AND visibility = 'public' ORDER BY sort_order ASC, filename COLLATE NOCASE ASC",
             (collection["id"],),
         ).fetchall()
+        parent_options = []
 
     selected_video_id = request.args.get("v")
     selected_video = None
@@ -110,6 +134,7 @@ def collection_page(collection_path):
         videos=videos,
         selected_video=selected_video,
         breadcrumbs=breadcrumbs,
+        parent_options=parent_options,
     )
 
 

@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import uuid
 
 from flask import Blueprint, abort, redirect, render_template, request, url_for
@@ -11,6 +12,24 @@ from settings import UPLOAD_FOLDER
 
 admin_bp = Blueprint("admin", __name__)
 ALLOWED_VISIBILITY = {"public", "unlisted", "private"}
+
+
+def get_descendant_ids(conn, root_id):
+    rows = conn.execute("SELECT id, parent_id FROM collections").fetchall()
+    by_parent = {}
+    for row in rows:
+        by_parent.setdefault(row["parent_id"], []).append(row["id"])
+
+    descendants = set()
+    stack = [root_id]
+    while stack:
+        current = stack.pop()
+        for child_id in by_parent.get(current, []):
+            if child_id not in descendants:
+                descendants.add(child_id)
+                stack.append(child_id)
+
+    return descendants
 
 
 @admin_bp.route("/admin")
@@ -57,15 +76,55 @@ def update_collection_settings(collection_id):
     if not return_path.startswith("/"):
         return_path = "/admin"
 
-    visibility = request.form.get("visibility") or "public"
+    conn = get_db()
+    current = conn.execute(
+        "SELECT id, name, slug, parent_id, visibility FROM collections WHERE id = ?",
+        (collection_id,),
+    ).fetchone()
+    if not current:
+        conn.close()
+        abort(404)
+
+    visibility = request.form.get("visibility") or current["visibility"] or "public"
     if visibility not in ALLOWED_VISIBILITY:
         visibility = "public"
 
-    conn = get_db()
-    conn.execute(
-        "UPDATE collections SET visibility = ? WHERE id = ?",
-        (visibility, collection_id),
-    )
+    updated_name = (request.form.get("name") or "").strip() or current["name"]
+
+    raw_slug = (request.form.get("slug") or "").strip()
+    if raw_slug:
+        updated_slug = secure_filename(raw_slug) or current["slug"]
+    else:
+        updated_slug = current["slug"]
+
+    parent_id = request.form.get("parent_id") or None
+    if parent_id == collection_id:
+        conn.close()
+        abort(400)
+
+    if parent_id:
+        parent = conn.execute(
+            "SELECT id FROM collections WHERE id = ?",
+            (parent_id,),
+        ).fetchone()
+        if not parent:
+            conn.close()
+            abort(400)
+
+        descendants = get_descendant_ids(conn, collection_id)
+        if parent_id in descendants:
+            conn.close()
+            abort(400)
+
+    try:
+        conn.execute(
+            "UPDATE collections SET name = ?, slug = ?, parent_id = ?, visibility = ? WHERE id = ?",
+            (updated_name, updated_slug, parent_id, visibility, collection_id),
+        )
+    except sqlite3.IntegrityError:
+        conn.close()
+        abort(400)
+
     conn.commit()
     conn.close()
 
