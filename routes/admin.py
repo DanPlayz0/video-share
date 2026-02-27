@@ -17,7 +17,7 @@ ALLOWED_VISIBILITY = {"public", "unlisted", "private"}
 @admin_required
 def admin_panel():
     conn = get_db()
-    collections = conn.execute("SELECT * FROM collections WHERE parent_id IS NULL").fetchall()
+    collections = get_collection_parent_options(conn)
     conn.close()
     return render_template("admin_panel.html", collections=collections)
 

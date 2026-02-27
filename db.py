@@ -88,13 +88,18 @@ def get_collection_parent_options(conn):
 
     options = []
 
-    def walk(parent_id=None, depth=0):
+    def walk(parent_id=None, depth=0, slug_parts=None):
+        if slug_parts is None:
+            slug_parts = []
+
         for item in by_parent.get(parent_id, []):
+            current_slug_parts = [*slug_parts, item["slug"]]
             options.append({
                 "id": item["id"],
                 "label": f"{'— ' * depth}{item['name']}",
+                "path": "/".join(current_slug_parts),
             })
-            walk(item["id"], depth + 1)
+            walk(item["id"], depth + 1, current_slug_parts)
 
     walk()
     return options
