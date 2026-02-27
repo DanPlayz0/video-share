@@ -32,6 +32,11 @@ def home():
     return render_template("home.html")
 
 
+@public_bp.route("/robots.txt")
+def robots_txt():
+    return "User-agent: *\nDisallow: /\n", 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
 @public_bp.route("/analytics/page_visit", methods=["POST"])
 def analytics_page_visit():
     payload = request.get_json(silent=True) or {}
