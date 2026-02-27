@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Admin Panel</h1>
+    <h2>Top-Level Collections</h2>
+    <ul>
+    {% for c in collections %}
+        <li><a href="/{{c.slug}}">{{c.name}}</a></li>
+    {% endfor %}
+    </ul>
+</div>
+{% endblock %}

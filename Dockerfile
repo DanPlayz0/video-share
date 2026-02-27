@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
+RUN adduser --disabled-password --gecos "" appuser
+
 # Create app directory
 WORKDIR /app
 
@@ -14,14 +16,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Create downloads folder
-RUN mkdir -p downloads
+# Create storage root folder
+RUN mkdir -p /data && chown -R appuser:appuser /app /data
 
 # Environment
 ENV PYTHONUNBUFFERED=1
 ENV PORT=5000
+ENV GUNICORN_WORKERS=2
+ENV GUNICORN_THREADS=4
+ENV GUNICORN_TIMEOUT=120
 
 EXPOSE 5000
 
+USER appuser
+
 # Run with gunicorn (production server)
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "app:app"]
+CMD ["sh", "-c", "gunicorn -w ${GUNICORN_WORKERS} --threads ${GUNICORN_THREADS} --timeout ${GUNICORN_TIMEOUT} -b 0.0.0.0:${PORT} app:app"]

@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}{{collection.name}}{% endblock %}
+
+{% block head_extra %}
+<style>
+    .watch-layout {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 16px;
+        align-items: start;
+    }
+    @media (max-width: 900px) {
+        .watch-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+    .playlist-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        color: #ece7df;
+        border: 1px solid #3a332a;
+        border-radius: 6px;
+        background: #222222;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+        cursor: pointer;
+    }
+    .playlist-item.active {
+        border-color: #d6b98c;
+        background: #3a3123;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if session.get("admin_logged_in") %}
+<div class="card">
+    <h3>Collection Settings (Admin)</h3>
+    <form method="POST" action="/admin/collection/{{ collection.id }}/settings">
+        <input type="hidden" name="return_path" value="{{ request.full_path if request.query_string else request.path }}">
+        <label for="collection-visibility">Visibility</label><br>
+        <select id="collection-visibility" name="visibility" style="margin-top: 8px; margin-bottom: 8px;">
+            <option value="public" {% if collection.visibility == "public" %}selected{% endif %}>Public</option>
+            <option value="unlisted" {% if collection.visibility == "unlisted" %}selected{% endif %}>Unlisted</option>
+            <option value="private" {% if collection.visibility == "private" %}selected{% endif %}>Private</option>
+        </select><br>
+        <div style="font-size: 14px; color: #b6aa99; margin-bottom: 10px;">
+            Public: shown in parent collection lists.<br>
+            Unlisted: hidden from lists, accessible by direct URL.<br>
+            Private: admin-only access.
+        </div>
+        <button type="submit">Save Collection Settings</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Upload Video to This Collection</h3>
+    <form method="POST" action="/upload" enctype="multipart/form-data">
+        <input type="hidden" name="collection_id" value="{{ collection.id }}">
+        <input type="hidden" name="return_path" value="{{ request.full_path if request.query_string else request.path }}">
+
+        <input type="file" name="file" required><br><br>
+
+        <label>Custom video title (optional)</label><br>
+        <input type="text" name="display_name" placeholder="Example: Week 1 Intro"><br><br>
+
+        <label>Playlist order (optional)</label><br>
+        <input type="number" name="sort_order" min="0" placeholder="Auto"><br><br>
+
+        <label>Visibility</label><br>
+        <select name="visibility">
+            <option value="public">Public</option>
+            <option value="unlisted">Unlisted</option>
+            <option value="private">Private</option>
+        </select><br><br>
+
+        <button type="submit">Upload to This Collection</button>
+    </form>
+</div>
+{% endif %}
+
+{% if selected_video or videos %}
+<div class="watch-layout">
+    {% if selected_video %}
+    <div class="card">
+        <h3 id="current-video-title">Now Playing: {{ selected_video.display_name or selected_video.filename }}</h3>
+        <video id="collection-video" controls width="100%"></video>
+    </div>
+    {% endif %}
+
+    {% if videos %}
+    <div class="card">
+        <h3>Playlist</h3>
+        {% for v in videos %}
+            <button
+                type="button"
+                class="playlist-item{% if selected_video and v.id == selected_video.id %} active{% endif %}"
+                data-video-id="{{ v.id }}"
+                data-video-name="{{ v.display_name or v.filename }}"
+            >
+                {{ v.display_name or v.filename }}
+            </button>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if session.get("admin_logged_in") and videos %}
+<div class="card">
+    <h3>Edit Playlist (Admin)</h3>
+    <form method="POST" action="/admin/playlist/{{ collection.id }}">
+        <input type="hidden" name="return_path" value="{{ request.full_path if request.query_string else request.path }}">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 6px;">Video</th>
+                    <th style="text-align: left; padding: 6px;">Custom Name</th>
+                    <th style="text-align: left; padding: 6px; width: 110px;">Order</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in videos %}
+                <tr>
+                    <td style="padding: 6px; color: #b6aa99;">{{ v.filename }}</td>
+                    <td style="padding: 6px;">
+                        <input
+                            type="text"
+                            name="title_{{ v.id }}"
+                            value="{{ v.display_name or v.filename }}"
+                            style="width: 100%;"
+                        >
+                    </td>
+                    <td style="padding: 6px;">
+                        <input
+                            type="number"
+                            name="order_{{ v.id }}"
+                            value="{{ v.sort_order }}"
+                            style="width: 90px;"
+                        >
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" style="margin-top: 12px;">Save Playlist Changes</button>
+    </form>
+</div>
+{% endif %}
+
+{% if sub_collections %}
+<div class="card">
+    <h3>Sub-collections</h3>
+    <ul>
+        {% for c in sub_collections %}
+            <li><a href="{{ request.path }}/{{c.slug}}">{{c.name}}</a></li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if selected_video %}
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+const player = document.getElementById("collection-video");
+const titleEl = document.getElementById("current-video-title");
+const buttons = Array.from(document.querySelectorAll(".playlist-item"));
+let hls = null;
+let currentVideoId = "{{ selected_video.id }}";
+
+function sourceFor(videoId) {
+    return `/hls/${videoId}/playlist.m3u8`;
+}
+
+function setActive(videoId) {
+    buttons.forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.videoId === videoId);
+    });
+}
+
+function loadVideo(videoId, videoName) {
+    currentVideoId = videoId;
+    const src = sourceFor(videoId);
+    const storageKey = `resume_${videoId}`;
+
+    if (hls) {
+        hls.destroy();
+        hls = null;
+    }
+
+    if (player.canPlayType('application/vnd.apple.mpegurl')) {
+        player.src = src;
+    } else if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.loadSource(src);
+        hls.attachMedia(player);
+    } else {
+        player.src = src;
+    }
+
+    titleEl.textContent = `Now Playing: ${videoName}`;
+    setActive(videoId);
+    const nextUrl = `${window.location.pathname}?v=${videoId}`;
+    window.history.replaceState(null, "", nextUrl);
+
+    player.addEventListener("loadedmetadata", function restoreOnce() {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            player.currentTime = parseFloat(saved);
+        }
+        player.removeEventListener("loadedmetadata", restoreOnce);
+    });
+}
+
+player.addEventListener("timeupdate", () => {
+    if (!currentVideoId) return;
+    localStorage.setItem(`resume_${currentVideoId}`, player.currentTime);
+});
+
+player.addEventListener("ended", () => {
+    if (!currentVideoId) return;
+    localStorage.removeItem(`resume_${currentVideoId}`);
+});
+
+buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+        loadVideo(btn.dataset.videoId, btn.dataset.videoName);
+    });
+});
+
+loadVideo("{{ selected_video.id }}", "{{ selected_video.display_name or selected_video.filename }}");
+</script>
+{% endif %}
+{% endblock %}

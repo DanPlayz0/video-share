@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Video{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Upload Video</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" required><br><br>
+
+        <label>Custom video title (optional)</label><br>
+        <input type="text" name="display_name" placeholder="Example: Introduction to Flask"><br><br>
+
+        <label>Playlist order (optional)</label><br>
+        <input type="number" name="sort_order" min="0" placeholder="Auto"><br><br>
+
+        <select name="collection_id" required>
+            {% for c in collection_options %}
+                <option value="{{c.id}}">{{c.label}}</option>
+            {% endfor %}
+        </select><br><br>
+
+        <select name="visibility">
+            <option value="public">Public</option>
+            <option value="unlisted">Unlisted</option>
+            <option value="private">Private</option>
+        </select><br><br>
+
+        <div style="margin-bottom: 14px; font-size: 14px; color: #b6aa99; line-height: 1.5;">
+            <strong>Visibility guide:</strong><br>
+            <strong>Public</strong>: shown in collection pages and accessible to anyone who visits the collection.<br>
+            <strong>Unlisted</strong>: hidden from collection pages, but anyone with the direct video link can watch.<br>
+            <strong>Private</strong>: only visible to logged-in admins.
+        </div>
+
+        <button>Upload</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Create Collection{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Create Collection</h2>
+    <form method="POST">
+        <input name="name" placeholder="Collection Name" required><br><br>
+        <input name="slug" placeholder="URL Slug (no spaces)" required><br><br>
+        <select name="parent_id">
+            <option value="">Top-Level</option>
+            {% for c in parent_options %}
+                <option value="{{c.id}}">{{c.label}}</option>
+            {% endfor %}
+        </select><br><br>
+        <select name="visibility">
+            <option value="public">Public</option>
+            <option value="unlisted">Unlisted</option>
+            <option value="private">Private</option>
+        </select><br><br>
+        <button>Create</button>
+    </form>
+</div>
+{% endblock %}

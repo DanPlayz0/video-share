@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Video Library{% endblock %}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #111111;
+            color: #ece7df;
+        }
+        .topbar {
+            padding: 12px 20px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        .topbar a {
+            margin-right: 12px;
+            color: #d6b98c;
+        }
+        a,
+        a:visited {
+            color: #d6b98c;
+        }
+        a:hover,
+        a:focus {
+            color: #ead3b0;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 0 16px;
+        }
+        .breadcrumbs {
+            margin-bottom: 16px;
+            color: #b6aa99;
+            font-size: 14px;
+        }
+        .breadcrumbs a {
+            color: #d6b98c;
+            text-decoration: none;
+        }
+        .breadcrumbs span {
+            margin: 0 6px;
+        }
+        .card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+    </style>
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <nav class="topbar">
+        <a href="/">Home</a>
+        {% if session.get("admin_logged_in") %}
+            <a href="/admin">Admin Panel</a>
+            <a href="/upload">Upload</a>
+            <a href="/create_collection">Create Collection</a>
+            <a href="/logout">Logout</a>
+        {% else %}
+            <a href="/login">Admin Login</a>
+        {% endif %}
+    </nav>
+
+    <main class="container">
+        {% if breadcrumbs %}
+            <div class="breadcrumbs">
+                {% for crumb in breadcrumbs %}
+                    {% if crumb.url %}
+                        <a href="{{ crumb.url }}">{{ crumb.name }}</a>
+                    {% else %}
+                        <strong>{{ crumb.name }}</strong>
+                    {% endif %}
+                    {% if not loop.last %}<span>/</span>{% endif %}
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

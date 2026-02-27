@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}{{video.display_name or video.filename}}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>{{video.display_name or video.filename}}</h2>
+    <video id="video" controls width="100%"></video>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+const video = document.getElementById("video");
+const src = "/hls/{{video.id}}/playlist.m3u8";
+const storageKey = "resume_{{video.id}}";
+
+if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = src;
+} else if (Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource(src);
+    hls.attachMedia(video);
+}
+
+video.addEventListener("loadedmetadata", () => {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) video.currentTime = parseFloat(saved);
+});
+
+let lastSaved = 0;
+video.addEventListener("timeupdate", () => {
+    if (video.currentTime - lastSaved > 5) {
+        localStorage.setItem(storageKey, video.currentTime);
+        lastSaved = video.currentTime;
+    }
+});
+
+video.addEventListener("ended", () => {
+    localStorage.removeItem(storageKey);
+});
+</script>
+{% endblock %}
