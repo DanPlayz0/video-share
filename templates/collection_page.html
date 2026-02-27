@@ -89,6 +89,46 @@
         color: #b6aa99;
         font-size: 12px;
     }
+    .playlist-admin-table-wrap {
+        overflow-x: auto;
+        border: 1px solid #2a2a2a;
+        border-radius: 8px;
+    }
+    .playlist-admin-table {
+        width: 100%;
+        min-width: 1080px;
+        border-collapse: collapse;
+    }
+    .playlist-admin-table th {
+        text-align: left;
+        padding: 10px 8px;
+        color: #d7c8b3;
+        background: #202020;
+        border-bottom: 1px solid #2f2f2f;
+        font-weight: 600;
+        vertical-align: top;
+    }
+    .playlist-admin-table td {
+        padding: 8px;
+        border-bottom: 1px solid #2a2a2a;
+        vertical-align: top;
+    }
+    .playlist-admin-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    .admin-video-filename {
+        color: #b6aa99;
+        max-width: 220px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .compact-input {
+        width: 100%;
+    }
+    .compact-order {
+        width: 84px;
+    }
 </style>
 {% endblock %}
 
@@ -205,57 +245,59 @@
         <h3>Edit Playlist (Admin)</h3>
         <form method="POST" action="/admin/playlist/{{ collection.id }}">
             <input type="hidden" name="return_path" value="{{ request.full_path if request.query_string else request.path }}">
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align: left; padding: 6px;">Video</th>
-                        <th style="text-align: left; padding: 6px;">Custom Name</th>
-                        <th style="text-align: left; padding: 6px;">Description</th>
-                        <th style="text-align: left; padding: 6px; width: 90px;">Length</th>
-                        <th style="text-align: left; padding: 6px; width: 170px;">HLS Status</th>
-                        <th style="text-align: left; padding: 6px; width: 170px;">Progress</th>
-                        <th style="text-align: left; padding: 6px; width: 110px;">Order</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for v in videos %}
-                    <tr>
-                        <td style="padding: 6px; color: #b6aa99;">{{ v.filename }}</td>
-                        <td style="padding: 6px;">
-                            <input
-                                type="text"
-                                name="title_{{ v.id }}"
-                                value="{{ v.display_name or v.filename }}"
-                                style="width: 100%;"
-                            >
-                        </td>
-                        <td style="padding: 6px;">
-                            <textarea name="description_{{ v.id }}" rows="2" style="width: 100%;">{{ v.description or '' }}</textarea>
-                        </td>
-                        <td style="padding: 6px; color: #b6aa99;">{{ v.duration_seconds|duration_label }}</td>
-                        <td style="padding: 6px; color: #b6aa99;">
-                            <span id="hls-status-{{ v.id }}" class="status-chip status-{{ v.hls_status|lower }}">{{ v.hls_status }}</span>
-                            <span id="hls-segments-{{ v.id }}">({{ v.hls_segments_generated }}/{{ v.hls_segments_expected }})</span>
-                        </td>
-                        <td style="padding: 6px;">
-                            {% set progress_pct = v.hls_progress_pct or 0 %}
-                            <div class="progress-track">
-                                <div id="hls-progress-fill-{{ v.id }}" class="progress-fill" style="width: {{ progress_pct }}%;"></div>
-                            </div>
-                            <div id="hls-progress-text-{{ v.id }}" class="progress-text">{{ progress_pct }}% {{ v.hls_step or '' }}</div>
-                        </td>
-                        <td style="padding: 6px;">
-                            <input
-                                type="number"
-                                name="order_{{ v.id }}"
-                                value="{{ v.sort_order }}"
-                                style="width: 90px;"
-                            >
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="playlist-admin-table-wrap">
+                <table class="playlist-admin-table">
+                    <thead>
+                        <tr>
+                            <th>Video</th>
+                            <th>Custom Name</th>
+                            <th>Description</th>
+                            <th style="width: 90px;">Length</th>
+                            <th style="width: 170px;">HLS Status</th>
+                            <th style="width: 170px;">Progress</th>
+                            <th style="width: 90px;">Order</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in videos %}
+                        <tr>
+                            <td><div class="admin-video-filename" title="{{ v.filename }}">{{ v.filename }}</div></td>
+                            <td>
+                                <input
+                                    type="text"
+                                    name="title_{{ v.id }}"
+                                    value="{{ v.display_name or v.filename }}"
+                                    class="compact-input"
+                                >
+                            </td>
+                            <td>
+                                <textarea name="description_{{ v.id }}" rows="2" class="compact-input">{{ v.description or '' }}</textarea>
+                            </td>
+                            <td style="color: #b6aa99;">{{ v.duration_seconds|duration_label }}</td>
+                            <td style="color: #b6aa99;">
+                                <span id="hls-status-{{ v.id }}" class="status-chip status-{{ v.hls_status|lower }}">{{ v.hls_status }}</span>
+                                <span id="hls-segments-{{ v.id }}">({{ v.hls_segments_generated }}/{{ v.hls_segments_expected }})</span>
+                            </td>
+                            <td>
+                                {% set progress_pct = v.hls_progress_pct or 0 %}
+                                <div class="progress-track">
+                                    <div id="hls-progress-fill-{{ v.id }}" class="progress-fill" style="width: {{ progress_pct }}%;"></div>
+                                </div>
+                                <div id="hls-progress-text-{{ v.id }}" class="progress-text">{{ progress_pct }}% {{ v.hls_step or '' }}</div>
+                            </td>
+                            <td>
+                                <input
+                                    type="number"
+                                    name="order_{{ v.id }}"
+                                    value="{{ v.sort_order }}"
+                                    class="compact-order"
+                                >
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
             <button type="submit" style="margin-top: 12px;">Save Playlist Changes</button>
         </form>
     </div>
