@@ -1,7 +1,12 @@
 import os
+import sqlite3
 import subprocess
+import threading
 
-from settings import HLS_FOLDER
+from settings import DATABASE, HLS_FOLDER
+
+HLS_RUNTIME_PROGRESS = {}
+HLS_RUNTIME_LOCK = threading.Lock()
 
 
 def probe_duration_seconds(input_path):
@@ -78,7 +83,39 @@ def inspect_hls_state(video_id):
     }
 
 
-def convert_to_hls(video_id, input_path):
+def _update_hls_metadata(video_id, **fields):
+    if not fields:
+        return
+
+    conn = sqlite3.connect(DATABASE)
+    conn.execute("PRAGMA busy_timeout = 5000")
+
+    assignments = ", ".join(f"{key} = ?" for key in fields.keys())
+    values = list(fields.values()) + [video_id]
+    conn.execute(f"UPDATE videos SET {assignments} WHERE id = ?", values)
+    conn.commit()
+    conn.close()
+
+
+def _set_runtime_progress(video_id, payload):
+    with HLS_RUNTIME_LOCK:
+        current = HLS_RUNTIME_PROGRESS.get(video_id, {})
+        current.update(payload)
+        HLS_RUNTIME_PROGRESS[video_id] = current
+
+
+def get_runtime_hls_progress(video_id):
+    with HLS_RUNTIME_LOCK:
+        item = HLS_RUNTIME_PROGRESS.get(video_id)
+        return dict(item) if item else None
+
+
+def clear_runtime_hls_progress(video_id):
+    with HLS_RUNTIME_LOCK:
+        HLS_RUNTIME_PROGRESS.pop(video_id, None)
+
+
+def convert_to_hls(video_id, input_path, duration_seconds=0):
     output_dir = os.path.join(HLS_FOLDER, video_id)
     os.makedirs(output_dir, exist_ok=True)
     playlist_path = os.path.join(output_dir, "playlist.m3u8")
@@ -94,6 +131,8 @@ def convert_to_hls(video_id, input_path):
         "-c:a", "aac",
         "-b:a", "160k",
         "-f", "hls",
+        "-progress", "pipe:1",
+        "-nostats",
         "-hls_time", "6",
         "-hls_playlist_type", "vod",
         "-hls_segment_filename",
@@ -101,4 +140,140 @@ def convert_to_hls(video_id, input_path):
         playlist_path,
     ]
 
-    subprocess.Popen(cmd)
+    existing_runtime = get_runtime_hls_progress(video_id)
+    if existing_runtime and existing_runtime.get("status") == "processing":
+        return
+
+    _update_hls_metadata(
+        video_id,
+        hls_status="processing",
+        hls_progress_pct=0,
+        hls_step="starting",
+        hls_error=None,
+    )
+
+    _set_runtime_progress(
+        video_id,
+        {
+            "status": "processing",
+            "progress_pct": 0,
+            "step": "starting",
+            "error": "",
+            "segments_generated": 0,
+            "segments_expected": 0,
+        },
+    )
+
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+
+    def monitor_progress():
+        last_progress = 0
+
+        if process.stdout:
+            for raw_line in process.stdout:
+                line = (raw_line or "").strip()
+                if not line or "=" not in line:
+                    continue
+
+                key, value = line.split("=", 1)
+                if key == "out_time_ms":
+                    try:
+                        out_seconds = int(value) / 1_000_000
+                    except ValueError:
+                        continue
+
+                    if duration_seconds and duration_seconds > 0:
+                        computed = int((out_seconds / duration_seconds) * 100)
+                        next_progress = min(99, max(0, computed))
+                        if next_progress != last_progress:
+                            last_progress = next_progress
+                            hls_state_live = inspect_hls_state(video_id)
+                            _set_runtime_progress(
+                                video_id,
+                                {
+                                    "status": "processing",
+                                    "progress_pct": last_progress,
+                                    "step": "encoding",
+                                    "segments_generated": hls_state_live["segments_generated"],
+                                    "segments_expected": hls_state_live["segments_expected"],
+                                },
+                            )
+                elif key == "progress" and value == "end":
+                    break
+
+        return_code = process.wait()
+        hls_state = inspect_hls_state(video_id)
+
+        if return_code == 0 and hls_state["status"] == "complete":
+            _set_runtime_progress(
+                video_id,
+                {
+                    "status": "complete",
+                    "progress_pct": 100,
+                    "step": "done",
+                    "error": "",
+                    "segments_generated": hls_state["segments_generated"],
+                    "segments_expected": hls_state["segments_expected"],
+                },
+            )
+            _update_hls_metadata(
+                video_id,
+                hls_status="complete",
+                hls_progress_pct=100,
+                hls_step="done",
+                hls_error=None,
+                hls_segments_generated=hls_state["segments_generated"],
+                hls_segments_expected=hls_state["segments_expected"],
+            )
+            return
+
+        if return_code == 0:
+            _set_runtime_progress(
+                video_id,
+                {
+                    "status": "processing",
+                    "progress_pct": max(last_progress, 1),
+                    "step": "finalizing",
+                    "error": "",
+                    "segments_generated": hls_state["segments_generated"],
+                    "segments_expected": hls_state["segments_expected"],
+                },
+            )
+            _update_hls_metadata(
+                video_id,
+                hls_status="processing",
+                hls_progress_pct=max(last_progress, 1),
+                hls_step="finalizing",
+                hls_error=None,
+                hls_segments_generated=hls_state["segments_generated"],
+                hls_segments_expected=hls_state["segments_expected"],
+            )
+            return
+
+        _set_runtime_progress(
+            video_id,
+            {
+                "status": "failed",
+                "step": "error",
+                "error": f"ffmpeg exited with code {return_code}",
+                "segments_generated": hls_state["segments_generated"],
+                "segments_expected": hls_state["segments_expected"],
+            },
+        )
+        _update_hls_metadata(
+            video_id,
+            hls_status="failed",
+            hls_step="error",
+            hls_error=f"ffmpeg exited with code {return_code}",
+            hls_segments_generated=hls_state["segments_generated"],
+            hls_segments_expected=hls_state["segments_expected"],
+        )
+
+    thread = threading.Thread(target=monitor_progress, daemon=True)
+    thread.start()

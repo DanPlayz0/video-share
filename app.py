@@ -27,13 +27,14 @@ from settings import UPLOAD_FOLDER
 def run_startup_backfill():
     conn = get_db()
     videos = conn.execute(
-        "SELECT id, filename, duration_seconds FROM videos"
+        "SELECT id, filename, duration_seconds, hls_progress_pct FROM videos"
     ).fetchall()
     retries_triggered = 0
 
     for video in videos:
         video_id = video["id"]
         duration_seconds = int(video["duration_seconds"] or 0)
+        hls_progress_pct = int(video["hls_progress_pct"] or 0)
         media_path = os.path.join(UPLOAD_FOLDER, f"{video_id}_{video['filename']}")
 
         if duration_seconds <= 0 and os.path.exists(media_path):
@@ -48,15 +49,39 @@ def run_startup_backfill():
             and hls_state["status"] in {"missing", "processing", "pending"}
         )
         if should_retry:
-            convert_to_hls(video_id, media_path)
+            convert_to_hls(video_id, media_path, duration_seconds=duration_seconds)
             retries_triggered += 1
             hls_state["status"] = "processing"
+            hls_progress_pct = 0
+
+        if hls_state["status"] == "complete":
+            hls_progress_pct = 100
+            hls_step = "done"
+            hls_error = None
+        elif hls_state["status"] == "processing":
+            hls_progress_pct = min(hls_progress_pct, 99)
+            hls_step = "encoding"
+            hls_error = None
+        elif hls_state["status"] == "missing":
+            hls_progress_pct = 0
+            hls_step = "missing"
+            hls_error = None
+        elif should_retry:
+            hls_progress_pct = 0
+            hls_step = "retrying"
+            hls_error = None
+        else:
+            hls_step = "pending"
+            hls_error = None
 
         conn.execute(
             """
             UPDATE videos
             SET duration_seconds = ?,
                 hls_status = ?,
+                hls_progress_pct = ?,
+                hls_step = ?,
+                hls_error = ?,
                 hls_segments_generated = ?,
                 hls_segments_expected = ?
             WHERE id = ?
@@ -64,6 +89,9 @@ def run_startup_backfill():
             (
                 duration_seconds,
                 hls_state["status"],
+                hls_progress_pct,
+                hls_step,
+                hls_error,
                 hls_state["segments_generated"],
                 hls_state["segments_expected"],
                 video_id,

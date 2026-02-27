@@ -46,6 +46,49 @@
         border-color: #d6b98c;
         background: #3a3123;
     }
+    .status-chip {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    .status-complete {
+        color: #9fbba3;
+        background: #1f2a22;
+        border-color: #3f5444;
+    }
+    .status-processing {
+        color: #c2ae8f;
+        background: #2d261c;
+        border-color: #5a4a33;
+    }
+    .status-missing,
+    .status-pending,
+    .status-failed {
+        color: #be9a9a;
+        background: #2d2020;
+        border-color: #5a3d3d;
+    }
+    .progress-track {
+        width: 130px;
+        height: 8px;
+        background: #2a2a2a;
+        border: 1px solid #3a332a;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 4px;
+    }
+    .progress-fill {
+        height: 100%;
+        background: #6f8f7a;
+        width: 0%;
+    }
+    .progress-text {
+        color: #b6aa99;
+        font-size: 12px;
+    }
 </style>
 {% endblock %}
 
@@ -160,6 +203,7 @@
                         <th style="text-align: left; padding: 6px;">Custom Name</th>
                         <th style="text-align: left; padding: 6px; width: 90px;">Length</th>
                         <th style="text-align: left; padding: 6px; width: 170px;">HLS Status</th>
+                        <th style="text-align: left; padding: 6px; width: 170px;">Progress</th>
                         <th style="text-align: left; padding: 6px; width: 110px;">Order</th>
                     </tr>
                 </thead>
@@ -177,7 +221,15 @@
                         </td>
                         <td style="padding: 6px; color: #b6aa99;">{{ v.duration_seconds|duration_label }}</td>
                         <td style="padding: 6px; color: #b6aa99;">
-                            {{ v.hls_status }} ({{ v.hls_segments_generated }}/{{ v.hls_segments_expected }})
+                            <span id="hls-status-{{ v.id }}" class="status-chip status-{{ v.hls_status|lower }}">{{ v.hls_status }}</span>
+                            <span id="hls-segments-{{ v.id }}">({{ v.hls_segments_generated }}/{{ v.hls_segments_expected }})</span>
+                        </td>
+                        <td style="padding: 6px;">
+                            {% set progress_pct = v.hls_progress_pct or 0 %}
+                            <div class="progress-track">
+                                <div id="hls-progress-fill-{{ v.id }}" class="progress-fill" style="width: {{ progress_pct }}%;"></div>
+                            </div>
+                            <div id="hls-progress-text-{{ v.id }}" class="progress-text">{{ progress_pct }}% {{ v.hls_step or '' }}</div>
                         </td>
                         <td style="padding: 6px;">
                             <input
@@ -223,6 +275,43 @@ function attachAutoTitle(fileInputId, titleInputId) {
 
 attachAutoTitle("collection-upload-file", "collection-upload-display-name");
 </script>
+{% if session.get("admin_logged_in") and videos %}
+<script>
+const collectionId = "{{ collection.id }}";
+
+function applyHlsProgress(item) {
+    const statusEl = document.getElementById(`hls-status-${item.id}`);
+    const segmentsEl = document.getElementById(`hls-segments-${item.id}`);
+    const fillEl = document.getElementById(`hls-progress-fill-${item.id}`);
+    const textEl = document.getElementById(`hls-progress-text-${item.id}`);
+
+    if (!statusEl || !segmentsEl || !fillEl || !textEl) return;
+
+    const normalizedStatus = (item.status || "pending").toLowerCase();
+    const progress = Math.max(0, Math.min(100, Number(item.progress_pct || 0)));
+
+    statusEl.textContent = item.status || "pending";
+    statusEl.className = `status-chip status-${normalizedStatus}`;
+    segmentsEl.textContent = `(${item.segments_generated}/${item.segments_expected})`;
+    fillEl.style.width = `${progress}%`;
+    textEl.textContent = `${progress}% ${item.step || ""}`.trim();
+}
+
+async function refreshHlsProgress() {
+    try {
+        const res = await fetch(`/admin/hls_progress/${collectionId}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const payload = await res.json();
+        const items = payload.videos || [];
+        items.forEach(applyHlsProgress);
+    } catch (err) {
+    }
+}
+
+refreshHlsProgress();
+setInterval(refreshHlsProgress, 3000);
+</script>
+{% endif %}
 {% if selected_video %}
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>

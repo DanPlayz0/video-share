@@ -35,6 +35,9 @@ def init_db():
         display_name TEXT,
         duration_seconds INTEGER NOT NULL DEFAULT 0,
         hls_status TEXT NOT NULL DEFAULT 'pending',
+        hls_progress_pct INTEGER NOT NULL DEFAULT 0,
+        hls_step TEXT NOT NULL DEFAULT 'pending',
+        hls_error TEXT,
         hls_segments_generated INTEGER NOT NULL DEFAULT 0,
         hls_segments_expected INTEGER NOT NULL DEFAULT 0,
         sort_order INTEGER NOT NULL DEFAULT 0,
@@ -57,6 +60,12 @@ def init_db():
         c.execute("ALTER TABLE videos ADD COLUMN duration_seconds INTEGER NOT NULL DEFAULT 0")
     if "hls_status" not in columns:
         c.execute("ALTER TABLE videos ADD COLUMN hls_status TEXT NOT NULL DEFAULT 'pending'")
+    if "hls_progress_pct" not in columns:
+        c.execute("ALTER TABLE videos ADD COLUMN hls_progress_pct INTEGER NOT NULL DEFAULT 0")
+    if "hls_step" not in columns:
+        c.execute("ALTER TABLE videos ADD COLUMN hls_step TEXT NOT NULL DEFAULT 'pending'")
+    if "hls_error" not in columns:
+        c.execute("ALTER TABLE videos ADD COLUMN hls_error TEXT")
     if "hls_segments_generated" not in columns:
         c.execute("ALTER TABLE videos ADD COLUMN hls_segments_generated INTEGER NOT NULL DEFAULT 0")
     if "hls_segments_expected" not in columns:
@@ -68,6 +77,7 @@ def init_db():
         "UPDATE videos SET display_name = filename WHERE display_name IS NULL OR TRIM(display_name) = ''"
     )
     c.execute("UPDATE videos SET hls_status = 'pending' WHERE hls_status IS NULL OR TRIM(hls_status) = ''")
+    c.execute("UPDATE videos SET hls_step = 'pending' WHERE hls_step IS NULL OR TRIM(hls_step) = ''")
 
     conn.commit()
     conn.close()

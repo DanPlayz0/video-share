@@ -2,12 +2,17 @@ import os
 import sqlite3
 import uuid
 
-from flask import Blueprint, abort, redirect, render_template, request, url_for
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 from werkzeug.utils import secure_filename
 
 from db import get_collection_parent_options, get_db
 from decorators import admin_required
-from hls_utils import convert_to_hls, inspect_hls_state, probe_duration_seconds
+from hls_utils import (
+    convert_to_hls,
+    get_runtime_hls_progress,
+    inspect_hls_state,
+    probe_duration_seconds,
+)
 from settings import UPLOAD_FOLDER
 
 admin_bp = Blueprint("admin", __name__)
@@ -174,13 +179,16 @@ def upload():
             sort_order = next_sort_order
 
         conn.execute(
-            "INSERT INTO videos (id, filename, display_name, duration_seconds, hls_status, hls_segments_generated, hls_segments_expected, sort_order, visibility, collection_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO videos (id, filename, display_name, duration_seconds, hls_status, hls_progress_pct, hls_step, hls_error, hls_segments_generated, hls_segments_expected, sort_order, visibility, collection_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 video_id,
                 filename,
                 final_display_name,
                 duration_seconds,
                 hls_state["status"],
+                0,
+                "pending",
+                None,
                 hls_state["segments_generated"],
                 hls_state["segments_expected"],
                 sort_order,
@@ -191,7 +199,7 @@ def upload():
         conn.commit()
         conn.close()
 
-        convert_to_hls(video_id, save_path)
+        convert_to_hls(video_id, save_path, duration_seconds=duration_seconds)
 
         if return_path.startswith("/"):
             return redirect(return_path)
@@ -238,3 +246,51 @@ def update_playlist(collection_id):
     conn.close()
 
     return redirect(return_path)
+
+
+@admin_bp.route("/admin/hls_progress/<collection_id>")
+@admin_required
+def hls_progress(collection_id):
+    conn = get_db()
+    videos = conn.execute(
+        """
+        SELECT id, hls_status, hls_progress_pct, hls_step, hls_error,
+               hls_segments_generated, hls_segments_expected
+        FROM videos
+        WHERE collection_id = ?
+        """,
+        (collection_id,),
+    ).fetchall()
+    conn.close()
+
+    result = []
+    for row in videos:
+        runtime = get_runtime_hls_progress(row["id"])
+        if runtime:
+            status = runtime.get("status") or row["hls_status"]
+            progress_pct = int(runtime.get("progress_pct") or 0)
+            step = runtime.get("step") or row["hls_step"] or ""
+            error = runtime.get("error") or row["hls_error"] or ""
+            segments_generated = int(runtime.get("segments_generated") or row["hls_segments_generated"] or 0)
+            segments_expected = int(runtime.get("segments_expected") or row["hls_segments_expected"] or 0)
+        else:
+            status = row["hls_status"]
+            progress_pct = int(row["hls_progress_pct"] or 0)
+            step = row["hls_step"] or ""
+            error = row["hls_error"] or ""
+            segments_generated = int(row["hls_segments_generated"] or 0)
+            segments_expected = int(row["hls_segments_expected"] or 0)
+
+        result.append(
+            {
+                "id": row["id"],
+                "status": status,
+                "progress_pct": progress_pct,
+                "step": step,
+                "error": error,
+                "segments_generated": segments_generated,
+                "segments_expected": segments_expected,
+            }
+        )
+
+    return jsonify({"videos": result})
