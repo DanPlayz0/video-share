@@ -146,6 +146,7 @@ def upload():
     if request.method == "POST":
         file = request.files["file"]
         display_name = (request.form.get("display_name") or "").strip()
+        description = (request.form.get("description") or "").strip()
         sort_order_input = (request.form.get("sort_order") or "").strip()
         visibility = request.form.get("visibility", "public")
         collection_id = request.form.get("collection_id")
@@ -179,11 +180,12 @@ def upload():
             sort_order = next_sort_order
 
         conn.execute(
-            "INSERT INTO videos (id, filename, display_name, duration_seconds, hls_status, hls_progress_pct, hls_step, hls_error, hls_segments_generated, hls_segments_expected, sort_order, visibility, collection_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO videos (id, filename, display_name, description, duration_seconds, hls_status, hls_progress_pct, hls_step, hls_error, hls_segments_generated, hls_segments_expected, sort_order, visibility, collection_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 video_id,
                 filename,
                 final_display_name,
+                description,
                 duration_seconds,
                 hls_state["status"],
                 0,
@@ -218,18 +220,21 @@ def update_playlist(collection_id):
 
     conn = get_db()
     videos = conn.execute(
-        "SELECT id, filename, display_name, sort_order, hls_status, hls_segments_generated, hls_segments_expected FROM videos WHERE collection_id = ?",
+        "SELECT id, filename, display_name, description, sort_order, hls_status, hls_segments_generated, hls_segments_expected FROM videos WHERE collection_id = ?",
         (collection_id,),
     ).fetchall()
 
     for video in videos:
         video_id = video["id"]
         name_key = f"title_{video_id}"
+        description_key = f"description_{video_id}"
         order_key = f"order_{video_id}"
 
         updated_name = (request.form.get(name_key) or "").strip()
         if not updated_name:
             updated_name = video["filename"]
+
+        updated_description = (request.form.get(description_key) or "").strip()
 
         order_input = (request.form.get(order_key) or "").strip()
         try:
@@ -238,8 +243,8 @@ def update_playlist(collection_id):
             updated_order = video["sort_order"] or 0
 
         conn.execute(
-            "UPDATE videos SET display_name = ?, sort_order = ? WHERE id = ? AND collection_id = ?",
-            (updated_name, updated_order, video_id, collection_id),
+            "UPDATE videos SET display_name = ?, description = ?, sort_order = ? WHERE id = ? AND collection_id = ?",
+            (updated_name, updated_description, updated_order, video_id, collection_id),
         )
 
     conn.commit()

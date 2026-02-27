@@ -2,6 +2,7 @@ import os
 import sqlite3
 import subprocess
 import threading
+import time
 
 from settings import DATABASE, HLS_FOLDER
 
@@ -87,14 +88,22 @@ def _update_hls_metadata(video_id, **fields):
     if not fields:
         return
 
-    conn = sqlite3.connect(DATABASE)
-    conn.execute("PRAGMA busy_timeout = 5000")
-
     assignments = ", ".join(f"{key} = ?" for key in fields.keys())
     values = list(fields.values()) + [video_id]
-    conn.execute(f"UPDATE videos SET {assignments} WHERE id = ?", values)
-    conn.commit()
-    conn.close()
+
+    for attempt in range(5):
+        conn = sqlite3.connect(DATABASE, timeout=10)
+        conn.execute("PRAGMA busy_timeout = 10000")
+        try:
+            conn.execute(f"UPDATE videos SET {assignments} WHERE id = ?", values)
+            conn.commit()
+            conn.close()
+            return
+        except sqlite3.OperationalError as exc:
+            conn.close()
+            if "locked" not in str(exc).lower() or attempt == 4:
+                raise
+            time.sleep(0.2 * (2 ** attempt))
 
 
 def _set_runtime_progress(video_id, payload):

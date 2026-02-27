@@ -5,6 +5,9 @@
 {% block content %}
 <div class="card">
     <h2>{{video.display_name or video.filename}}</h2>
+    {% if video.description %}
+    <p style="color: #b6aa99; margin-top: 6px;">{{ video.description }}</p>
+    {% endif %}
     <video id="video" controls width="100%"></video>
 </div>
 {% endblock %}

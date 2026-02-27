@@ -98,6 +98,11 @@
     {% if selected_video %}
     <div class="card">
         <h3 id="current-video-title">Now Playing: {{ selected_video.display_name or selected_video.filename }}</h3>
+        {% if selected_video.description %}
+        <p id="current-video-description" style="color: #b6aa99; margin-top: 6px;">{{ selected_video.description }}</p>
+        {% else %}
+        <p id="current-video-description" style="color: #b6aa99; margin-top: 6px;"></p>
+        {% endif %}
         <video id="collection-video" controls width="100%"></video>
     </div>
     {% endif %}
@@ -111,6 +116,7 @@
                 class="playlist-item{% if selected_video and v.id == selected_video.id %} active{% endif %}"
                 data-video-id="{{ v.id }}"
                 data-video-name="{{ v.display_name or v.filename }}"
+                data-video-description="{{ (v.description or '')|e }}"
             >
                 {{ loop.index }}. {{ v.display_name or v.filename }} ({{ v.duration_seconds|duration_label }})
             </button>
@@ -177,6 +183,9 @@
             <label>Custom video title (optional)</label><br>
             <input id="collection-upload-display-name" type="text" name="display_name" placeholder="Example: Week 1 Intro"><br><br>
 
+            <label>Description (optional)</label><br>
+            <textarea name="description" rows="3" placeholder="Add notes, agenda, or context for this video" style="width: 100%;"></textarea><br><br>
+
             <label>Playlist order (optional)</label><br>
             <input type="number" name="sort_order" min="0" placeholder="Auto"><br><br>
 
@@ -201,6 +210,7 @@
                     <tr>
                         <th style="text-align: left; padding: 6px;">Video</th>
                         <th style="text-align: left; padding: 6px;">Custom Name</th>
+                        <th style="text-align: left; padding: 6px;">Description</th>
                         <th style="text-align: left; padding: 6px; width: 90px;">Length</th>
                         <th style="text-align: left; padding: 6px; width: 170px;">HLS Status</th>
                         <th style="text-align: left; padding: 6px; width: 170px;">Progress</th>
@@ -218,6 +228,9 @@
                                 value="{{ v.display_name or v.filename }}"
                                 style="width: 100%;"
                             >
+                        </td>
+                        <td style="padding: 6px;">
+                            <textarea name="description_{{ v.id }}" rows="2" style="width: 100%;">{{ v.description or '' }}</textarea>
                         </td>
                         <td style="padding: 6px; color: #b6aa99;">{{ v.duration_seconds|duration_label }}</td>
                         <td style="padding: 6px; color: #b6aa99;">
@@ -317,6 +330,7 @@ setInterval(refreshHlsProgress, 3000);
 <script>
 const player = document.getElementById("collection-video");
 const titleEl = document.getElementById("current-video-title");
+const descriptionEl = document.getElementById("current-video-description");
 const buttons = Array.from(document.querySelectorAll(".playlist-item"));
 let hls = null;
 let currentVideoId = "{{ selected_video.id }}";
@@ -352,6 +366,11 @@ function loadVideo(videoId, videoName) {
     }
 
     titleEl.textContent = `Now Playing: ${videoName}`;
+    if (descriptionEl) {
+        const selected = buttons.find((btn) => btn.dataset.videoId === videoId);
+        const description = (selected && selected.dataset.videoDescription) ? selected.dataset.videoDescription : "";
+        descriptionEl.textContent = description;
+    }
     setActive(videoId);
     const nextUrl = `${window.location.pathname}?v=${videoId}`;
     window.history.replaceState(null, "", nextUrl);

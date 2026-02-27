@@ -33,6 +33,7 @@ def init_db():
         id TEXT PRIMARY KEY,
         filename TEXT NOT NULL,
         display_name TEXT,
+        description TEXT,
         duration_seconds INTEGER NOT NULL DEFAULT 0,
         hls_status TEXT NOT NULL DEFAULT 'pending',
         hls_progress_pct INTEGER NOT NULL DEFAULT 0,
@@ -56,6 +57,8 @@ def init_db():
     }
     if "display_name" not in columns:
         c.execute("ALTER TABLE videos ADD COLUMN display_name TEXT")
+    if "description" not in columns:
+        c.execute("ALTER TABLE videos ADD COLUMN description TEXT")
     if "duration_seconds" not in columns:
         c.execute("ALTER TABLE videos ADD COLUMN duration_seconds INTEGER NOT NULL DEFAULT 0")
     if "hls_status" not in columns:

@@ -1,4 +1,5 @@
 import os
+from contextlib import suppress
 
 from flask import Flask, jsonify, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -17,6 +18,7 @@ from settings import (
     SESSION_COOKIE_SECURE,
     STARTUP_HLS_RETRY_ENABLED,
     STARTUP_HLS_RETRY_LIMIT,
+    STORAGE_ROOT,
     TRUST_PROXY,
     ensure_storage_dirs,
     validate_runtime_settings,
@@ -25,10 +27,12 @@ from settings import UPLOAD_FOLDER
 
 
 def run_startup_backfill():
-    conn = get_db()
-    videos = conn.execute(
+    read_conn = get_db()
+    videos = read_conn.execute(
         "SELECT id, filename, duration_seconds, hls_progress_pct FROM videos"
     ).fetchall()
+    read_conn.close()
+
     retries_triggered = 0
 
     for video in videos:
@@ -74,7 +78,8 @@ def run_startup_backfill():
             hls_step = "pending"
             hls_error = None
 
-        conn.execute(
+        write_conn = get_db()
+        write_conn.execute(
             """
             UPDATE videos
             SET duration_seconds = ?,
@@ -97,16 +102,34 @@ def run_startup_backfill():
                 video_id,
             ),
         )
+        write_conn.commit()
+        write_conn.close()
 
-    conn.commit()
-    conn.close()
+
+def run_startup_backfill_once():
+    lock_path = os.path.join(STORAGE_ROOT, ".startup_backfill.lock")
+
+    try:
+        import fcntl
+
+        with open(lock_path, "w", encoding="utf-8") as lock_file:
+            try:
+                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return
+
+            run_startup_backfill()
+            with suppress(Exception):
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+    except ImportError:
+        run_startup_backfill()
 
 
 def create_app():
     validate_runtime_settings()
     ensure_storage_dirs()
     init_db()
-    run_startup_backfill()
+    run_startup_backfill_once()
 
     app = Flask(__name__)
     app.secret_key = SECRET_KEY
