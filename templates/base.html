@@ -52,6 +52,50 @@
             padding: 16px;
             margin-bottom: 16px;
         }
+        input,
+        select,
+        textarea {
+            background: #232323;
+            color: #ece7df;
+            border: 1px solid #3a332a;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font: inherit;
+            box-sizing: border-box;
+        }
+        input::placeholder,
+        textarea::placeholder {
+            color: #9f9588;
+        }
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #d6b98c;
+            box-shadow: 0 0 0 2px rgba(214, 185, 140, 0.25);
+        }
+        button,
+        input[type="submit"],
+        input[type="button"] {
+            background: #3a3123;
+            color: #ece7df;
+            border: 1px solid #d6b98c;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font: inherit;
+            cursor: pointer;
+        }
+        button:hover,
+        input[type="submit"]:hover,
+        input[type="button"]:hover {
+            background: #4a3d2d;
+        }
+        button:disabled,
+        input[type="submit"]:disabled,
+        input[type="button"]:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
     </style>
     {% block head_extra %}{% endblock %}
 </head>
