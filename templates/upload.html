@@ -6,10 +6,10 @@
 <div class="card">
     <h2>Upload Video</h2>
     <form method="POST" enctype="multipart/form-data">
-        <input type="file" name="file" required><br><br>
+        <input id="upload-file" type="file" name="file" required><br><br>
 
         <label>Custom video title (optional)</label><br>
-        <input type="text" name="display_name" placeholder="Example: Introduction to Flask"><br><br>
+        <input id="upload-display-name" type="text" name="display_name" placeholder="Example: Introduction to Flask"><br><br>
 
         <label>Playlist order (optional)</label><br>
         <input type="number" name="sort_order" min="0" placeholder="Auto"><br><br>
@@ -36,4 +36,30 @@
         <button>Upload</button>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function attachAutoTitle(fileInputId, titleInputId) {
+    const fileInput = document.getElementById(fileInputId);
+    const titleInput = document.getElementById(titleInputId);
+    if (!fileInput || !titleInput) return;
+
+    fileInput.addEventListener("change", () => {
+        const selectedFile = fileInput.files && fileInput.files[0];
+        if (!selectedFile) return;
+
+        const baseName = selectedFile.name.replace(/\.[^/.]+$/, "");
+        const lastAuto = titleInput.dataset.lastAutoValue || "";
+        const current = titleInput.value.trim();
+
+        if (!current || current === lastAuto) {
+            titleInput.value = baseName;
+            titleInput.dataset.lastAutoValue = baseName;
+        }
+    });
+}
+
+attachAutoTitle("upload-file", "upload-display-name");
+</script>
 {% endblock %}
