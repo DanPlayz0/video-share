@@ -119,6 +119,7 @@
                     <th style="text-align: left; padding: 6px;">Video</th>
                     <th style="text-align: left; padding: 6px;">Custom Name</th>
                     <th style="text-align: left; padding: 6px; width: 90px;">Length</th>
+                    <th style="text-align: left; padding: 6px; width: 170px;">HLS Status</th>
                     <th style="text-align: left; padding: 6px; width: 110px;">Order</th>
                 </tr>
             </thead>
@@ -135,6 +136,9 @@
                         >
                     </td>
                     <td style="padding: 6px; color: #b6aa99;">{{ v.duration_seconds|duration_label }}</td>
+                    <td style="padding: 6px; color: #b6aa99;">
+                        {{ v.hls_status }} ({{ v.hls_segments_generated }}/{{ v.hls_segments_expected }})
+                    </td>
                     <td style="padding: 6px;">
                         <input
                             type="number"

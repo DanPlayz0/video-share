@@ -4,6 +4,7 @@ from flask import Flask, jsonify, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from db import get_db, init_db
+from hls_utils import inspect_hls_state, probe_duration_seconds
 from routes.admin import admin_bp
 from routes.auth import auth_bp
 from routes.public import public_bp
@@ -18,12 +19,52 @@ from settings import (
     ensure_storage_dirs,
     validate_runtime_settings,
 )
+from settings import UPLOAD_FOLDER
+
+
+def run_startup_backfill():
+    conn = get_db()
+    videos = conn.execute(
+        "SELECT id, filename, duration_seconds FROM videos"
+    ).fetchall()
+
+    for video in videos:
+        video_id = video["id"]
+        duration_seconds = int(video["duration_seconds"] or 0)
+        media_path = os.path.join(UPLOAD_FOLDER, f"{video_id}_{video['filename']}")
+
+        if duration_seconds <= 0 and os.path.exists(media_path):
+            duration_seconds = probe_duration_seconds(media_path)
+
+        hls_state = inspect_hls_state(video_id)
+
+        conn.execute(
+            """
+            UPDATE videos
+            SET duration_seconds = ?,
+                hls_status = ?,
+                hls_segments_generated = ?,
+                hls_segments_expected = ?
+            WHERE id = ?
+            """,
+            (
+                duration_seconds,
+                hls_state["status"],
+                hls_state["segments_generated"],
+                hls_state["segments_expected"],
+                video_id,
+            ),
+        )
+
+    conn.commit()
+    conn.close()
 
 
 def create_app():
     validate_runtime_settings()
     ensure_storage_dirs()
     init_db()
+    run_startup_backfill()
 
     app = Flask(__name__)
     app.secret_key = SECRET_KEY

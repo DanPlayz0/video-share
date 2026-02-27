@@ -34,6 +34,9 @@ def init_db():
         filename TEXT NOT NULL,
         display_name TEXT,
         duration_seconds INTEGER NOT NULL DEFAULT 0,
+        hls_status TEXT NOT NULL DEFAULT 'pending',
+        hls_segments_generated INTEGER NOT NULL DEFAULT 0,
+        hls_segments_expected INTEGER NOT NULL DEFAULT 0,
         sort_order INTEGER NOT NULL DEFAULT 0,
         visibility TEXT NOT NULL DEFAULT 'public',
         collection_id TEXT,
@@ -52,12 +55,19 @@ def init_db():
         c.execute("ALTER TABLE videos ADD COLUMN display_name TEXT")
     if "duration_seconds" not in columns:
         c.execute("ALTER TABLE videos ADD COLUMN duration_seconds INTEGER NOT NULL DEFAULT 0")
+    if "hls_status" not in columns:
+        c.execute("ALTER TABLE videos ADD COLUMN hls_status TEXT NOT NULL DEFAULT 'pending'")
+    if "hls_segments_generated" not in columns:
+        c.execute("ALTER TABLE videos ADD COLUMN hls_segments_generated INTEGER NOT NULL DEFAULT 0")
+    if "hls_segments_expected" not in columns:
+        c.execute("ALTER TABLE videos ADD COLUMN hls_segments_expected INTEGER NOT NULL DEFAULT 0")
     if "sort_order" not in columns:
         c.execute("ALTER TABLE videos ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
 
     c.execute(
         "UPDATE videos SET display_name = filename WHERE display_name IS NULL OR TRIM(display_name) = ''"
     )
+    c.execute("UPDATE videos SET hls_status = 'pending' WHERE hls_status IS NULL OR TRIM(hls_status) = ''")
 
     conn.commit()
     conn.close()

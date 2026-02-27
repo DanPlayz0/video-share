@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 
 from db import get_collection_parent_options, get_db
 from decorators import admin_required
-from hls_utils import convert_to_hls, probe_duration_seconds
+from hls_utils import convert_to_hls, inspect_hls_state, probe_duration_seconds
 from settings import UPLOAD_FOLDER
 
 admin_bp = Blueprint("admin", __name__)
@@ -100,6 +100,7 @@ def upload():
         save_path = os.path.join(UPLOAD_FOLDER, video_id + "_" + filename)
         file.save(save_path)
         duration_seconds = probe_duration_seconds(save_path)
+        hls_state = inspect_hls_state(video_id)
 
         conn = get_db()
         max_order_row = conn.execute(
@@ -114,8 +115,19 @@ def upload():
             sort_order = next_sort_order
 
         conn.execute(
-            "INSERT INTO videos (id, filename, display_name, duration_seconds, sort_order, visibility, collection_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (video_id, filename, final_display_name, duration_seconds, sort_order, visibility, collection_id),
+            "INSERT INTO videos (id, filename, display_name, duration_seconds, hls_status, hls_segments_generated, hls_segments_expected, sort_order, visibility, collection_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                video_id,
+                filename,
+                final_display_name,
+                duration_seconds,
+                hls_state["status"],
+                hls_state["segments_generated"],
+                hls_state["segments_expected"],
+                sort_order,
+                visibility,
+                collection_id,
+            ),
         )
         conn.commit()
         conn.close()
@@ -139,7 +151,7 @@ def update_playlist(collection_id):
 
     conn = get_db()
     videos = conn.execute(
-        "SELECT id, filename, display_name, sort_order FROM videos WHERE collection_id = ?",
+        "SELECT id, filename, display_name, sort_order, hls_status, hls_segments_generated, hls_segments_expected FROM videos WHERE collection_id = ?",
         (collection_id,),
     ).fetchall()
 
