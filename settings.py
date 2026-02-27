@@ -26,6 +26,8 @@ PERMANENT_SESSION_LIFETIME = timedelta(days=int(os.getenv("SESSION_LIFETIME_DAYS
 TRUST_PROXY = os.getenv("TRUST_PROXY", "true" if IS_PRODUCTION else "false").lower() == "true"
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "2048"))
 MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
+STARTUP_HLS_RETRY_ENABLED = os.getenv("STARTUP_HLS_RETRY_ENABLED", "true").lower() == "true"
+STARTUP_HLS_RETRY_LIMIT = int(os.getenv("STARTUP_HLS_RETRY_LIMIT", "50"))
 
 
 def validate_runtime_settings():

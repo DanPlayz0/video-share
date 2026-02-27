@@ -4,7 +4,7 @@ from flask import Flask, jsonify, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from db import get_db, init_db
-from hls_utils import inspect_hls_state, probe_duration_seconds
+from hls_utils import convert_to_hls, inspect_hls_state, probe_duration_seconds
 from routes.admin import admin_bp
 from routes.auth import auth_bp
 from routes.public import public_bp
@@ -15,6 +15,8 @@ from settings import (
     SESSION_COOKIE_HTTPONLY,
     SESSION_COOKIE_SAMESITE,
     SESSION_COOKIE_SECURE,
+    STARTUP_HLS_RETRY_ENABLED,
+    STARTUP_HLS_RETRY_LIMIT,
     TRUST_PROXY,
     ensure_storage_dirs,
     validate_runtime_settings,
@@ -27,6 +29,7 @@ def run_startup_backfill():
     videos = conn.execute(
         "SELECT id, filename, duration_seconds FROM videos"
     ).fetchall()
+    retries_triggered = 0
 
     for video in videos:
         video_id = video["id"]
@@ -37,6 +40,17 @@ def run_startup_backfill():
             duration_seconds = probe_duration_seconds(media_path)
 
         hls_state = inspect_hls_state(video_id)
+
+        should_retry = (
+            STARTUP_HLS_RETRY_ENABLED
+            and retries_triggered < STARTUP_HLS_RETRY_LIMIT
+            and os.path.exists(media_path)
+            and hls_state["status"] in {"missing", "processing", "pending"}
+        )
+        if should_retry:
+            convert_to_hls(video_id, media_path)
+            retries_triggered += 1
+            hls_state["status"] = "processing"
 
         conn.execute(
             """
