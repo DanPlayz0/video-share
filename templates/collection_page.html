@@ -129,6 +129,9 @@
     .compact-order {
         width: 84px;
     }
+    .is-hidden {
+        display: none;
+    }
 </style>
 {% endblock %}
 
@@ -252,6 +255,7 @@
                             <th>Video</th>
                             <th>Custom Name</th>
                             <th>Description</th>
+                            <th style="width: 130px;">Visibility</th>
                             <th style="width: 90px;">Length</th>
                             <th style="width: 230px;">HLS</th>
                             <th style="width: 90px;">Order</th>
@@ -272,14 +276,21 @@
                             <td>
                                 <textarea name="description_{{ v.id }}" rows="2" class="compact-input">{{ v.description or '' }}</textarea>
                             </td>
+                            <td>
+                                <select name="visibility_{{ v.id }}" class="compact-input">
+                                    <option value="public" {% if v.visibility == "public" %}selected{% endif %}>Public</option>
+                                    <option value="unlisted" {% if v.visibility == "unlisted" %}selected{% endif %}>Unlisted</option>
+                                    <option value="private" {% if v.visibility == "private" %}selected{% endif %}>Private</option>
+                                </select>
+                            </td>
                             <td style="color: #b6aa99;">{{ v.duration_seconds|duration_label }}</td>
                             <td>
                                 <span id="hls-status-{{ v.id }}" class="status-chip status-{{ v.hls_status|lower }}">{{ v.hls_status }}</span>
                                 <span id="hls-segments-{{ v.id }}">({{ v.hls_segments_generated }}/{{ v.hls_segments_expected }})</span>
                                 {% set progress_pct = v.hls_progress_pct or 0 %}
-                                <div id="hls-progress-wrap-{{ v.id }}" {% if progress_pct >= 100 %}style="display: none;"{% endif %}>
+                                <div id="hls-progress-wrap-{{ v.id }}" class="{% if progress_pct >= 100 %}is-hidden{% endif %}">
                                     <div class="progress-track">
-                                        <div id="hls-progress-fill-{{ v.id }}" class="progress-fill" style="width: {{ progress_pct }}%;"></div>
+                                        <div id="hls-progress-fill-{{ v.id }}" class="progress-fill" data-progress="{{ progress_pct }}" style="width: 0%;"></div>
                                     </div>
                                     <div id="hls-progress-text-{{ v.id }}" class="progress-text">{{ progress_pct }}% {{ v.hls_step or '' }}</div>
                                 </div>
@@ -366,6 +377,11 @@ async function refreshHlsProgress() {
 
 refreshHlsProgress();
 setInterval(refreshHlsProgress, 3000);
+
+document.querySelectorAll(".progress-fill[data-progress]").forEach((el) => {
+    const value = Math.max(0, Math.min(100, Number(el.dataset.progress || 0)));
+    el.style.width = `${value}%`;
+});
 </script>
 {% endif %}
 {% if selected_video %}

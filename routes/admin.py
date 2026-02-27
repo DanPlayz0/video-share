@@ -220,7 +220,7 @@ def update_playlist(collection_id):
 
     conn = get_db()
     videos = conn.execute(
-        "SELECT id, filename, display_name, description, sort_order, hls_status, hls_segments_generated, hls_segments_expected FROM videos WHERE collection_id = ?",
+        "SELECT id, filename, display_name, description, visibility, sort_order, hls_status, hls_segments_generated, hls_segments_expected FROM videos WHERE collection_id = ?",
         (collection_id,),
     ).fetchall()
 
@@ -228,6 +228,7 @@ def update_playlist(collection_id):
         video_id = video["id"]
         name_key = f"title_{video_id}"
         description_key = f"description_{video_id}"
+        visibility_key = f"visibility_{video_id}"
         order_key = f"order_{video_id}"
 
         updated_name = (request.form.get(name_key) or "").strip()
@@ -235,6 +236,9 @@ def update_playlist(collection_id):
             updated_name = video["filename"]
 
         updated_description = (request.form.get(description_key) or "").strip()
+        updated_visibility = request.form.get(visibility_key) or video["visibility"]
+        if updated_visibility not in ALLOWED_VISIBILITY:
+            updated_visibility = video["visibility"]
 
         order_input = (request.form.get(order_key) or "").strip()
         try:
@@ -243,8 +247,8 @@ def update_playlist(collection_id):
             updated_order = video["sort_order"] or 0
 
         conn.execute(
-            "UPDATE videos SET display_name = ?, description = ?, sort_order = ? WHERE id = ? AND collection_id = ?",
-            (updated_name, updated_description, updated_order, video_id, collection_id),
+            "UPDATE videos SET display_name = ?, description = ?, visibility = ?, sort_order = ? WHERE id = ? AND collection_id = ?",
+            (updated_name, updated_description, updated_visibility, updated_order, video_id, collection_id),
         )
 
     conn.commit()
