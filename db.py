@@ -48,9 +48,40 @@ def init_db():
     )
     """)
 
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS page_visits (
+        path TEXT PRIMARY KEY,
+        visit_count INTEGER NOT NULL DEFAULT 0,
+        last_visited_at TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS video_views (
+        video_id TEXT PRIMARY KEY,
+        view_count INTEGER NOT NULL DEFAULT 0,
+        last_viewed_at TEXT,
+        FOREIGN KEY(video_id) REFERENCES videos(id)
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS video_watch_buckets (
+        video_id TEXT NOT NULL,
+        bucket_start_sec INTEGER NOT NULL,
+        watch_seconds REAL NOT NULL DEFAULT 0,
+        updated_at TEXT,
+        PRIMARY KEY(video_id, bucket_start_sec),
+        FOREIGN KEY(video_id) REFERENCES videos(id)
+    )
+    """)
+
     c.execute("CREATE INDEX IF NOT EXISTS idx_collections_parent_id ON collections(parent_id)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_videos_collection_order ON videos(collection_id, sort_order)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_videos_collection_visibility ON videos(collection_id, visibility)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_page_visits_count ON page_visits(visit_count DESC)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_video_views_count ON video_views(view_count DESC)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_watch_buckets_seconds ON video_watch_buckets(watch_seconds DESC)")
 
     columns = {
         row["name"] for row in c.execute("PRAGMA table_info(videos)").fetchall()

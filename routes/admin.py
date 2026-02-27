@@ -5,6 +5,7 @@ import uuid
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 from werkzeug.utils import secure_filename
 
+from analytics import get_analytics_dashboard
 from db import get_collection_parent_options, get_db
 from decorators import admin_required
 from hls_utils import (
@@ -44,6 +45,18 @@ def admin_panel():
     collections = get_collection_parent_options(conn)
     conn.close()
     return render_template("admin_panel.html", collections=collections)
+
+
+@admin_bp.route("/admin/analytics")
+@admin_required
+def analytics_panel():
+    dashboard = get_analytics_dashboard(limit=30)
+    return render_template(
+        "admin_analytics.html",
+        top_pages=dashboard["top_pages"],
+        top_videos=dashboard["top_videos"],
+        top_segments=dashboard["top_segments"],
+    )
 
 
 @admin_bp.route("/create_collection", methods=["GET", "POST"])

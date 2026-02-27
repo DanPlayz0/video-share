@@ -1,7 +1,8 @@
 import os
 
-from flask import Blueprint, abort, redirect, render_template, request, send_from_directory, session
+from flask import Blueprint, abort, jsonify, redirect, render_template, request, send_from_directory, session
 
+from analytics import record_page_visit, record_video_view, record_video_watch
 from db import get_collection_parent_options, get_db
 from settings import HLS_FOLDER
 
@@ -29,6 +30,39 @@ def get_descendant_ids(conn, root_id):
 @public_bp.route("/")
 def home():
     return render_template("home.html")
+
+
+@public_bp.route("/analytics/page_visit", methods=["POST"])
+def analytics_page_visit():
+    payload = request.get_json(silent=True) or {}
+    path = payload.get("path") or request.path
+    record_page_visit(path)
+    return ("", 204)
+
+
+@public_bp.route("/analytics/video_view", methods=["POST"])
+def analytics_video_view():
+    payload = request.get_json(silent=True) or {}
+    video_id = payload.get("video_id")
+    if not video_id:
+        return jsonify({"error": "video_id required"}), 400
+
+    record_video_view(video_id)
+    return ("", 204)
+
+
+@public_bp.route("/analytics/video_watch", methods=["POST"])
+def analytics_video_watch():
+    payload = request.get_json(silent=True) or {}
+    video_id = payload.get("video_id")
+    current_time = payload.get("current_time")
+    delta_seconds = payload.get("delta_seconds")
+
+    if not video_id:
+        return jsonify({"error": "video_id required"}), 400
+
+    record_video_watch(video_id, current_time, delta_seconds)
+    return ("", 204)
 
 
 @public_bp.route("/video/<video_id>")

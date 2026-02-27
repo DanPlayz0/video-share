@@ -104,6 +104,7 @@
         <a href="/">Home</a>
         {% if session.get("admin_logged_in") %}
             <a href="/admin">Admin Panel</a>
+            <a href="/admin/analytics">Analytics</a>
             <a href="/upload">Upload</a>
             <a href="/create_collection">Create Collection</a>
             <a href="/logout">Logout</a>
@@ -128,6 +129,23 @@
 
         {% block content %}{% endblock %}
     </main>
+    <script>
+    (function () {
+        const payload = JSON.stringify({ path: window.location.pathname });
+        if (navigator.sendBeacon) {
+            const blob = new Blob([payload], { type: "application/json" });
+            navigator.sendBeacon("/analytics/page_visit", blob);
+            return;
+        }
+
+        fetch("/analytics/page_visit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payload,
+            keepalive: true,
+        }).catch(() => {});
+    })();
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

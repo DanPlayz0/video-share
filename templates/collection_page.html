@@ -393,6 +393,35 @@ const descriptionEl = document.getElementById("current-video-description");
 const buttons = Array.from(document.querySelectorAll(".playlist-item"));
 let hls = null;
 let currentVideoId = "{{ selected_video.id }}";
+let viewedVideoIds = new Set();
+let lastWatchTime = null;
+let pendingWatchDelta = 0;
+
+function sendJson(url, payload, preferBeacon = false) {
+    const body = JSON.stringify(payload);
+    if (preferBeacon && navigator.sendBeacon) {
+        const blob = new Blob([body], { type: "application/json" });
+        navigator.sendBeacon(url, blob);
+        return;
+    }
+
+    fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        keepalive: true,
+    }).catch(() => {});
+}
+
+function flushWatch(preferBeacon = false) {
+    if (!currentVideoId || pendingWatchDelta <= 0) return;
+    sendJson("/analytics/video_watch", {
+        video_id: currentVideoId,
+        current_time: player.currentTime,
+        delta_seconds: pendingWatchDelta,
+    }, preferBeacon);
+    pendingWatchDelta = 0;
+}
 
 function sourceFor(videoId) {
     return `/hls/${videoId}/playlist.m3u8`;
@@ -405,6 +434,7 @@ function setActive(videoId) {
 }
 
 function loadVideo(videoId, videoName) {
+    flushWatch();
     currentVideoId = videoId;
     const src = sourceFor(videoId);
     const storageKey = `resume_${videoId}`;
@@ -434,23 +464,51 @@ function loadVideo(videoId, videoName) {
     const nextUrl = `${window.location.pathname}?v=${videoId}`;
     window.history.replaceState(null, "", nextUrl);
 
+    if (!viewedVideoIds.has(videoId)) {
+        viewedVideoIds.add(videoId);
+        sendJson("/analytics/video_view", { video_id: videoId });
+    }
+
     player.addEventListener("loadedmetadata", function restoreOnce() {
         const saved = localStorage.getItem(storageKey);
         if (saved) {
             player.currentTime = parseFloat(saved);
         }
+        lastWatchTime = player.currentTime;
         player.removeEventListener("loadedmetadata", restoreOnce);
     });
 }
 
 player.addEventListener("timeupdate", () => {
     if (!currentVideoId) return;
+
+    if (lastWatchTime !== null) {
+        const delta = player.currentTime - lastWatchTime;
+        if (delta > 0 && delta < 10) {
+            pendingWatchDelta += delta;
+        }
+    }
+    lastWatchTime = player.currentTime;
+
+    if (pendingWatchDelta >= 5) {
+        flushWatch();
+    }
+
     localStorage.setItem(`resume_${currentVideoId}`, player.currentTime);
+});
+
+player.addEventListener("pause", () => {
+    flushWatch();
 });
 
 player.addEventListener("ended", () => {
     if (!currentVideoId) return;
+    flushWatch();
     localStorage.removeItem(`resume_${currentVideoId}`);
+});
+
+window.addEventListener("beforeunload", () => {
+    flushWatch(true);
 });
 
 buttons.forEach((btn) => {

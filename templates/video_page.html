@@ -16,8 +16,38 @@
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
 const video = document.getElementById("video");
+const videoId = "{{ video.id }}";
 const src = "/hls/{{video.id}}/playlist.m3u8";
 const storageKey = "resume_{{video.id}}";
+let hasSentView = false;
+let lastWatchTime = null;
+let pendingWatchDelta = 0;
+
+function sendJson(url, payload, preferBeacon = false) {
+    const body = JSON.stringify(payload);
+    if (preferBeacon && navigator.sendBeacon) {
+        const blob = new Blob([body], { type: "application/json" });
+        navigator.sendBeacon(url, blob);
+        return;
+    }
+
+    fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        keepalive: true,
+    }).catch(() => {});
+}
+
+function flushWatch(preferBeacon = false) {
+    if (pendingWatchDelta <= 0) return;
+    sendJson("/analytics/video_watch", {
+        video_id: videoId,
+        current_time: video.currentTime,
+        delta_seconds: pendingWatchDelta,
+    }, preferBeacon);
+    pendingWatchDelta = 0;
+}
 
 if (video.canPlayType('application/vnd.apple.mpegurl')) {
     video.src = src;
@@ -30,18 +60,48 @@ if (video.canPlayType('application/vnd.apple.mpegurl')) {
 video.addEventListener("loadedmetadata", () => {
     const saved = localStorage.getItem(storageKey);
     if (saved) video.currentTime = parseFloat(saved);
+    lastWatchTime = video.currentTime;
+});
+
+video.addEventListener("play", () => {
+    if (!hasSentView) {
+        hasSentView = true;
+        sendJson("/analytics/video_view", { video_id: videoId });
+    }
+    lastWatchTime = video.currentTime;
 });
 
 let lastSaved = 0;
 video.addEventListener("timeupdate", () => {
+    if (lastWatchTime !== null) {
+        const delta = video.currentTime - lastWatchTime;
+        if (delta > 0 && delta < 10) {
+            pendingWatchDelta += delta;
+        }
+    }
+    lastWatchTime = video.currentTime;
+
+    if (pendingWatchDelta >= 5) {
+        flushWatch();
+    }
+
     if (video.currentTime - lastSaved > 5) {
         localStorage.setItem(storageKey, video.currentTime);
         lastSaved = video.currentTime;
     }
 });
 
+video.addEventListener("pause", () => {
+    flushWatch();
+});
+
 video.addEventListener("ended", () => {
+    flushWatch();
     localStorage.removeItem(storageKey);
+});
+
+window.addEventListener("beforeunload", () => {
+    flushWatch(true);
 });
 </script>
 {% endblock %}

@@ -4,6 +4,7 @@ from contextlib import suppress
 from flask import Flask, jsonify, render_template
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from analytics import start_analytics_flusher
 from db import get_db, init_db
 from hls_utils import convert_to_hls, inspect_hls_state, probe_duration_seconds
 from routes.admin import admin_bp
@@ -130,6 +131,7 @@ def create_app():
     ensure_storage_dirs()
     init_db()
     run_startup_backfill_once()
+    start_analytics_flusher()
 
     app = Flask(__name__)
     app.secret_key = SECRET_KEY
