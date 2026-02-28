@@ -28,6 +28,11 @@ MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "2048"))
 MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
 STARTUP_HLS_RETRY_ENABLED = os.getenv("STARTUP_HLS_RETRY_ENABLED", "true").lower() == "true"
 STARTUP_HLS_RETRY_LIMIT = int(os.getenv("STARTUP_HLS_RETRY_LIMIT", "50"))
+_hls_max_streams_raw = os.getenv("HLS_MAX_CONCURRENT_STREAMS", "2")
+try:
+    HLS_MAX_CONCURRENT_STREAMS = max(1, int(_hls_max_streams_raw))
+except ValueError:
+    HLS_MAX_CONCURRENT_STREAMS = 2
 
 
 def validate_runtime_settings():
