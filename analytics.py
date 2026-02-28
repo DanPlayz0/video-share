@@ -2,6 +2,7 @@ import atexit
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 from settings import DATABASE
 
@@ -17,6 +18,14 @@ WATCH_BUCKET_SECONDS = 10
 _FLUSH_THREAD = None
 _STOP_EVENT = threading.Event()
 
+ADMIN_ANALYTICS_PREFIXES = (
+    "/admin",
+)
+ADMIN_ANALYTICS_EXACT_PATHS = {
+    "/upload",
+    "/create_collection",
+}
+
 
 def _now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -26,8 +35,33 @@ def _buffer_size():
     return len(PAGE_VISIT_BUFFER) + len(VIDEO_VIEW_BUFFER) + len(VIDEO_WATCH_BUFFER)
 
 
+def _normalize_path(path):
+    raw = (path or "/").strip() or "/"
+    parsed = urlsplit(raw)
+    normalized = (parsed.path or "/").strip() or "/"
+    if not normalized.startswith("/"):
+        normalized = f"/{normalized}"
+    return normalized
+
+
+def _is_admin_analytics_path(path):
+    normalized = path.rstrip("/") or "/"
+
+    if normalized in ADMIN_ANALYTICS_EXACT_PATHS:
+        return True
+
+    for prefix in ADMIN_ANALYTICS_PREFIXES:
+        if normalized == prefix or normalized.startswith(f"{prefix}/"):
+            return True
+
+    return False
+
+
 def record_page_visit(path):
-    normalized = (path or "/").strip() or "/"
+    normalized = _normalize_path(path)
+    if _is_admin_analytics_path(normalized):
+        return
+
     with BUFFER_LOCK:
         PAGE_VISIT_BUFFER[normalized] = PAGE_VISIT_BUFFER.get(normalized, 0) + 1
         should_flush = _buffer_size() >= FLUSH_EVENT_THRESHOLD
