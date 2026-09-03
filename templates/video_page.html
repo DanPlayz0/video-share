@@ -9,6 +9,9 @@
     <p style="color: #b6aa99; margin-top: 6px;">{{ video.description }}</p>
     {% endif %}
     <video id="video" controls width="100%"></video>
+    <p style="margin: 12px 0 0;">
+        <a class="download-button" href="/video/{{ video.id }}/download">Download original MP4</a>
+    </p>
 </div>
 {% endblock %}
 

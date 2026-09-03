@@ -4,7 +4,7 @@ from flask import Blueprint, abort, jsonify, redirect, render_template, request,
 
 from analytics import record_page_visit, record_video_view, record_video_watch
 from db import get_collection_parent_options, get_db
-from settings import HLS_FOLDER
+from settings import HLS_FOLDER, UPLOAD_FOLDER
 
 public_bp = Blueprint("public", __name__)
 
@@ -90,6 +90,33 @@ def video_page(video_id):
     ]
 
     return render_template("video_page.html", video=video, breadcrumbs=breadcrumbs)
+
+
+@public_bp.route("/video/<video_id>/download")
+def download_video(video_id):
+    """Download the original uploaded video while preserving video visibility rules."""
+    conn = get_db()
+    video = conn.execute(
+        "SELECT id, filename, visibility FROM videos WHERE id = ?", (video_id,)
+    ).fetchone()
+    conn.close()
+
+    if not video:
+        abort(404)
+
+    if video["visibility"] == "private" and not session.get("admin_logged_in"):
+        abort(403)
+
+    stored_filename = f"{video['id']}_{video['filename']}"
+    if not os.path.isfile(os.path.join(UPLOAD_FOLDER, stored_filename)):
+        abort(404)
+
+    return send_from_directory(
+        UPLOAD_FOLDER,
+        stored_filename,
+        as_attachment=True,
+        download_name=video["filename"],
+    )
 
 
 @public_bp.route("/<path:collection_path>/video/<video_id>")

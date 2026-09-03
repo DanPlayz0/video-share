@@ -40,6 +40,7 @@
                 <th style="text-align: left; padding: 6px;">Video</th>
                 <th style="text-align: left; padding: 6px; width: 120px;">Views</th>
                 <th style="text-align: left; padding: 6px; width: 280px;">Last View (UTC)</th>
+                <th style="text-align: left; padding: 6px; width: 130px;">Download</th>
             </tr>
         </thead>
         <tbody>
@@ -48,9 +49,10 @@
                 <td style="padding: 6px;"><a href="/video/{{ row.id }}">{{ row.title }}</a></td>
                 <td style="padding: 6px;">{{ row.view_count }}</td>
                 <td style="padding: 6px; color: #b6aa99;">{{ row.last_viewed_at or '' }}</td>
+                <td style="padding: 6px;"><a class="download-button" href="/video/{{ row.id }}/download">Original MP4</a></td>
             </tr>
         {% else %}
-            <tr><td colspan="3" style="padding: 6px; color: #b6aa99;">No data yet.</td></tr>
+            <tr><td colspan="4" style="padding: 6px; color: #b6aa99;">No data yet.</td></tr>
         {% endfor %}
         </tbody>
     </table>
@@ -64,6 +66,7 @@
                 <th style="text-align: left; padding: 6px;">Video</th>
                 <th style="text-align: left; padding: 6px; width: 140px;">Segment Start</th>
                 <th style="text-align: left; padding: 6px; width: 160px;">Watch Seconds</th>
+                <th style="text-align: left; padding: 6px; width: 130px;">Download</th>
             </tr>
         </thead>
         <tbody>
@@ -72,9 +75,10 @@
                 <td style="padding: 6px;"><a href="/video/{{ row.id }}">{{ row.title }}</a></td>
                 <td style="padding: 6px; color: #b6aa99;">{{ row.bucket_start_sec }}s</td>
                 <td style="padding: 6px;">{{ '%.1f'|format(row.watch_seconds) }}</td>
+                <td style="padding: 6px;"><a class="download-button" href="/video/{{ row.id }}/download">Original MP4</a></td>
             </tr>
         {% else %}
-            <tr><td colspan="3" style="padding: 6px; color: #b6aa99;">No data yet.</td></tr>
+            <tr><td colspan="4" style="padding: 6px; color: #b6aa99;">No data yet.</td></tr>
         {% endfor %}
         </tbody>
     </table>
